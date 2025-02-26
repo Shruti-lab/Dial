@@ -12,6 +12,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.ContentValues.TAG
+import android.os.Build
+import android.telecom.TelecomManager
 import android.util.Log
 import com.example.dialerapp.R
 import com.example.dialerapp.utils.CallManager
@@ -22,14 +24,28 @@ class DialingScreen : AppCompatActivity() {
     private lateinit var btnCall: Button
     private val dialPadButtons = mutableListOf<Button>()
     private val phoneNumberBuilder = StringBuilder()
+    private val TAG = "DIALING SCREEN"
+
+    companion object {
+        const val REQUEST_CODE_SET_DEFAULT_DIALER=200
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialingscreen)
 
         initializeViews()
+        Log.e(TAG, "About to check if we're the default dialer")  // Using ERROR level for visibility
+        checkDefaultDialer()
         setupDialPadListeners()
         setupCallButton()
+
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.e(TAG, "onResume - checking default dialer status")
+        checkDefaultDialer()
     }
 
     private fun initializeViews() {
@@ -105,6 +121,39 @@ class DialingScreen : AppCompatActivity() {
 //        }
 //    }
 
+    private fun checkDefaultDialer() {
+        Log.d(TAG, "Check Default dialer called........")
+
+        val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
+        val isAlreadyDefaultDialer = packageName == telecomManager.defaultDialerPackage
+        if (isAlreadyDefaultDialer) {
+            Log.d(TAG, "Already a default dialer app")
+            return
+        }
+        val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+            .putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+        startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_DIALER)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQUEST_CODE_SET_DEFAULT_DIALER -> checkSetDefaultDialerResult(resultCode)
+        }
+    }
+
+    private fun checkSetDefaultDialerResult(resultCode: Int) {
+        val message = when (resultCode) {
+            RESULT_OK       -> "User accepted request to become default dialer"
+            RESULT_CANCELED -> "User declined request to become default dialer"
+            else            -> "Unexpected result code $resultCode"
+        }
+
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
+    }
+
     private fun makeCall(phoneNumber: String) {
         try {
             // Use CallManager to handle call initiation and recording
@@ -127,4 +176,5 @@ class DialingScreen : AppCompatActivity() {
 //    companion object {
 //        private const val CALL_PERMISSION_REQUEST_CODE = 200
 //    }
+
 }

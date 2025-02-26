@@ -4,32 +4,43 @@
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <!--Fore ground service permissions-->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+<!--    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />-->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
-    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+
 
     <!-- Android 14.0+ -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
 
     <!-- Basic Permissions -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT" />
+<!--    <uses-permission android:name="android.permission.READ_PHONE_STATE" />-->
+    <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" />
+    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+
+
 
 
     <!-- Android 8.0+ -->
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <!-- Grants the READ_PHONE_STATE permission only on devices that run
+         Android 10 (API level 29) and lower. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"
+        android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
 
     <application
-        android:name=".DialerApplication"
+        android:name="com.example.dialerapp.DialerApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -53,21 +64,46 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <!-- Dialing screen -->
         <activity
             android:name=".screens.DialingScreen"
             android:exported="true"
             android:theme="@style/Theme.DialerApp"
-            android:launchMode="singleTop"/>
+            android:launchMode="singleTop">
+        <intent-filter>
+            <action android:name="android.intent.action.DIAL"/>
+            <category android:name="android.intent.category.DEFAULT"/>
+        </intent-filter>
+        </activity>
         <!--            android:exported="false"-->
 
+        <!-- Incoming Call Activity -->
+        <activity
+            android:name=".screens.IncomingCallActivity"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showOnLockScreen="true"
+            android:exported="false" />
+
+        <!-- Outgoing Call Activity -->
+        <activity
+            android:name=".screens.OutgoingCallActivity"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showOnLockScreen="true"
+            android:exported="false" />
+
+        <!-- Connection Service -->
         <service android:name=".services.PhoneConnectionService"
+            android:exported="true"
             android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
             <intent-filter>
                 <action android:name="android.telecom.ConnectionService" />
             </intent-filter>
         </service>
 
+        <!-- Call Handling Service -->
         <service
             android:name=".services.CallHandlingService"
             android:permission="android.permission.FOREGROUND_SERVICE"
@@ -75,12 +111,14 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Service for handling call recordings -->
         <service android:name=".services.CallRecordingService"
             android:permission="android.permission.FOREGROUND_SERVICE"
             android:foregroundServiceType="microphone"
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Accessibility Service for Android 10+ -->
         <service
             android:name=".services.CallAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -93,16 +131,15 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <receiver
-            android:name=".receivers.CallStateReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:foregroundServiceType="phoneCall"
-            >
-            <intent-filter>
-                <action android:name="android.intent.action.PHONE_STATE" />
-            </intent-filter>
-        </receiver>
+<!--        <receiver-->
+<!--            android:name=".receivers.CallStateReceiver"-->
+<!--            android:enabled="true"-->
+<!--            android:exported="true"-->
+<!--            android:foregroundServiceType="phoneCall">-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.PHONE_STATE" />-->
+<!--            </intent-filter>-->
+<!--        </receiver>-->
     </application>
 
 </manifest>
