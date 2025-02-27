@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.telecom.TelecomManager
 import android.util.Log
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityManager
@@ -17,6 +18,7 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.dialerapp.R
+import com.example.dialerapp.screens.DialingScreen.Companion.REQUEST_CODE_SET_DEFAULT_DIALER
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 
@@ -44,12 +46,21 @@ class MainActivity : AppCompatActivity() {
         // Storage permissions (NOT NEEDED)
         private val STORAGE_PERMISSIONS = arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
 
+        private enum class PermissionState {
+            CHECK_RUNTIME_PERMISSIONS,
+            CHECK_DEFAULT_DIALER,
+            CHECK_ACCESSIBILITY,
+            ALL_PERMISSIONS_GRANTED
+        }
+
     }
     // Dialog references
     private var permissionRationaleDialog: AlertDialog? = null
     private var limitedFunctionalityDialog: AlertDialog? = null
     private var accessibilityServiceDialog: AlertDialog? = null
     private var limitedFunctionalityDialogForAccessibility: AlertDialog? = null
+    private var defaultDialerDialog: AlertDialog? = null
+    private var currentPermissionState = PermissionState.CHECK_RUNTIME_PERMISSIONS
 
     private val requiredPermissions: Array<String>
         get() {
@@ -93,9 +104,20 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        checkDefaultDialer()
+
 
         // Check permissions when activity creates
         checkAndRequestPermissions()
+    }
+
+    private fun nextPermissionState() {
+        when(currentPermissionState){
+            PermissionState.CHECK_RUNTIME_PERMISSIONS -> checkAndRequestPermissions()
+            PermissionState.CHECK_DEFAULT_DIALER -> checkDefaultDialer()
+            PermissionState.CHECK_ACCESSIBILITY -> checkAccessibilityService()
+            PermissionState.ALL_PERMISSIONS_GRANTED -> navigateToDialingScreen()
+        }
     }
 
     private fun checkAndRequestPermissions() {
@@ -110,7 +132,9 @@ class MainActivity : AppCompatActivity() {
             when {
                 permissionsToRequest.isEmpty() -> {
                     // All permissions are granted
-                    initializeApp()
+//                    initializeApp()
+                    currentPermissionState = PermissionState.CHECK_DEFAULT_DIALER
+                    nextPermissionState()
                 }
                 shouldShowRequestPermissionRationale(permissionsToRequest.first()) -> {
                     // Show explanation why permissions are needed
@@ -123,7 +147,9 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             // Below Android 6, permissions are granted at install time
-            initializeApp()
+//            initializeApp()
+            currentPermissionState = PermissionState.CHECK_DEFAULT_DIALER
+            nextPermissionState()
         }
     }
 
@@ -177,7 +203,9 @@ class MainActivity : AppCompatActivity() {
             when {
                 deniedPermissions.isEmpty() -> {
                     // All permissions granted
-                    initializeApp()
+//                    initializeApp()
+                    currentPermissionState = PermissionState.CHECK_DEFAULT_DIALER
+                    nextPermissionState()
                 }
                 deniedPermissions.any {
                     shouldShowRequestPermissionRationale(it)
@@ -240,7 +268,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             Log.d(TAG, "Daamn All done!")
             Toast.makeText(this, "Accessibility service is enabled", Toast.LENGTH_LONG).show()
-            navigateToDialingScreen()
+            currentPermissionState = PermissionState.ALL_PERMISSIONS_GRANTED
+            nextPermissionState()
             resetDenialCount()  // Reset denial count when service is enabled
             Log.d(TAG, "after accessibility service enabled...YAY!")
         }
@@ -300,7 +329,10 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
 
         // Check the accessibility service again when the activity resumes
-        checkAccessibilityService()
+        if (currentPermissionState == PermissionState.CHECK_ACCESSIBILITY) {
+            checkAccessibilityService()
+        }
+
     }
 
 //    override fun finish() {
@@ -310,20 +342,77 @@ class MainActivity : AppCompatActivity() {
 //    }
     override fun onDestroy() {
         super.onDestroy()
-        if(permissionRationaleDialog!= null &&  permissionRationaleDialog!!.isShowing){
-            permissionRationaleDialog!!.dismiss()
-        }
-        if (limitedFunctionalityDialog != null && limitedFunctionalityDialog!!.isShowing) {
-            limitedFunctionalityDialog!!.dismiss()
-        }
-        if (accessibilityServiceDialog != null && accessibilityServiceDialog!!.isShowing) {
-            accessibilityServiceDialog!!.dismiss()
-        }
-        if (limitedFunctionalityDialogForAccessibility != null && limitedFunctionalityDialogForAccessibility!!.isShowing) {
-            limitedFunctionalityDialogForAccessibility!!.dismiss()
-        }
+        defaultDialerDialog?.dismiss()
+        permissionRationaleDialog?.dismiss()
+    limitedFunctionalityDialog?.dismiss()
+    accessibilityServiceDialog?.dismiss()
+    limitedFunctionalityDialogForAccessibility?.dismiss()
+//        if(permissionRationaleDialog!= null &&  permissionRationaleDialog!!.isShowing){
+//            permissionRationaleDialog!!.dismiss()
+//        }
+//        if (limitedFunctionalityDialog != null && limitedFunctionalityDialog!!.isShowing) {
+//            limitedFunctionalityDialog!!.dismiss()
+//        }
+//        if (accessibilityServiceDialog != null && accessibilityServiceDialog!!.isShowing) {
+//            accessibilityServiceDialog!!.dismiss()
+//        }
+//        if (limitedFunctionalityDialogForAccessibility != null && limitedFunctionalityDialogForAccessibility!!.isShowing) {
+//            limitedFunctionalityDialogForAccessibility!!.dismiss()
+//        }
 
     }
+
+    private fun checkDefaultDialer() {
+        Log.d(TAG, "Check Default dialer called........")
+
+        val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
+        val isAlreadyDefaultDialer = packageName == telecomManager.defaultDialerPackage
+        if (isAlreadyDefaultDialer) {
+            Log.d(TAG, "Already a default dialer app")
+            currentPermissionState = PermissionState.CHECK_ACCESSIBILITY
+            nextPermissionState()
+            return
+        }
+
+        defaultDialerDialog = MaterialAlertDialogBuilder(this)
+            .setTitle("Set as Default Dialer")
+            .setMessage("This app needs to be set as your default dialer to access calling features. Would you like to set it as default now?")
+            .setPositiveButton("Yes") { _, _ ->
+                val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                    .putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+                startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_DIALER)
+            }
+            .setNegativeButton("Not Now") { _, _ ->
+                Toast.makeText(this, "Make it default", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQUEST_CODE_SET_DEFAULT_DIALER -> {
+                checkSetDefaultDialerResult(resultCode)
+
+                currentPermissionState = PermissionState.CHECK_ACCESSIBILITY
+                nextPermissionState()
+            }
+        }
+    }
+
+    private fun checkSetDefaultDialerResult(resultCode: Int) {
+        val message = when (resultCode) {
+            RESULT_OK       -> "User accepted request to become default dialer"
+            RESULT_CANCELED -> "User declined request to become default dialer"
+            else            -> "Unexpected result code $resultCode"
+        }
+
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
+    }
+
 
 }
 

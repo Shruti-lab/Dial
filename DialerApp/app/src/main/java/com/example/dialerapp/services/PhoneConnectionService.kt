@@ -49,7 +49,7 @@ class PhoneConnectionService: ConnectionService() {
         connection.setConnectionCapabilities(Connection.CAPABILITY_SUPPORT_HOLD)
         connection.setCallerDisplayName(request?.address?.schemeSpecificPart,PRESENTATION_ALLOWED)
         connection.setRinging()
-        
+
 
         // Register connection with CallManager
         CallManager.setCurrentConnection(connection)
